@@ -590,7 +590,7 @@ pub unsafe fn park(
         thread_data.key.store(key, Ordering::Relaxed);
         thread_data.park_token.set(park_token);
         thread_data.parker.prepare_park();
-        tracing::debug!("[parking_lot] park prepare_park finished");
+        tracing::trace!("[parking_lot] park prepare_park finished");
         if !bucket.queue_head.get().is_null() {
             (*bucket.queue_tail.get()).next_in_queue.set(thread_data);
         } else {
@@ -602,7 +602,7 @@ pub unsafe fn park(
 
         // Invoke the pre-sleep callback
         before_sleep();
-        tracing::debug!("[parking_lot] park before_sleep finished");
+        tracing::trace!("[parking_lot] park before_sleep finished");
 
         // Park our thread and determine whether we were woken up by an unpark
         // or by our timeout. Note that this isn't precise: we can still be
@@ -617,7 +617,7 @@ pub unsafe fn park(
             }
         };
 
-        tracing::debug!("[parking_lot] park unparked finished");
+        tracing::trace!("[parking_lot] park unparked finished");
 
         // If we were unparked, return now
         if unparked {
@@ -636,7 +636,7 @@ pub unsafe fn park(
             return ParkResult::Unparked(thread_data.unpark_token.get());
         }
 
-        tracing::debug!("[parking_lot] park before while loop");
+        tracing::trace!("[parking_lot] park before while loop");
 
         // We timed out, so we now need to remove our thread from the queue
         let mut link = &bucket.queue_head;
@@ -676,7 +676,7 @@ pub unsafe fn park(
             }
         }
 
-        tracing::debug!("[parking_lot] park after while loop");
+        tracing::trace!("[parking_lot] park after while loop");
 
         // There should be no way for our thread to have been removed from the queue
         // if we timed out.
