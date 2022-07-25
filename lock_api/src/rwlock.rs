@@ -465,7 +465,9 @@ impl<R: RawRwLock, T: ?Sized> RwLock<R, T> {
     /// when dropped.
     #[inline]
     pub fn write(&self) -> RwLockWriteGuard<'_, R, T> {
+        tracing::debug!("[parking_lot] write started");
         self.raw.lock_exclusive();
+        tracing::debug!("[parking_lot] lock_exclusive finished");
         // SAFETY: The lock is held, as required.
         unsafe { self.write_guard() }
     }

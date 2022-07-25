@@ -66,15 +66,20 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
 
     #[inline]
     fn lock_exclusive(&self) {
+        tracing::debug!("[parking_lot] lock_exclusive started");
         if self
             .state
             .compare_exchange_weak(0, WRITER_BIT, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
+            tracing::debug!("[parking_lot] lock_exclusive if condition started");
             let result = self.lock_exclusive_slow(None);
+            tracing::debug!("[parking_lot] lock_exclusive_slow finished");
             debug_assert!(result);
         }
+        tracing::debug!("[parking_lot] lock_exclusive_slow deadlock_acquire started");
         self.deadlock_acquire();
+        tracing::debug!("[parking_lot] lock_exclusive_slow deadlock_acquire finished");
     }
 
     #[inline]
@@ -605,7 +610,9 @@ impl RawRwLock {
 
     #[cold]
     fn lock_exclusive_slow(&self, timeout: Option<Instant>) -> bool {
+        tracing::debug!("[parking_lot] lock_exclusive_slow started");
         let try_lock = |state: &mut usize| {
+            tracing::debug!("[parking_lot] lock_exclusive_slow try lock inside");
             loop {
                 if *state & (WRITER_BIT | UPGRADABLE_BIT) != 0 {
                     return false;
@@ -623,6 +630,7 @@ impl RawRwLock {
                 }
             }
         };
+        tracing::debug!("[parking_lot] lock_exclusive_slow after try lock ");
 
         // Step 1: grab exclusive ownership of WRITER_BIT
         let timed_out = !self.lock_common(
@@ -631,12 +639,15 @@ impl RawRwLock {
             try_lock,
             WRITER_BIT | UPGRADABLE_BIT,
         );
+        tracing::debug!("[parking_lot] lock_exclusive_slow after timeout ");
         if timed_out {
             return false;
         }
 
         // Step 2: wait for all remaining readers to exit the lock.
-        self.wait_for_readers(timeout, 0)
+        let a = self.wait_for_readers(timeout, 0);
+        tracing::debug!("[parking_lot] lock_exclusive_slow after wait_for_readers");
+        a
     }
 
     #[cold]
@@ -967,6 +978,7 @@ impl RawRwLock {
     // WRITER_BIT.
     #[inline]
     fn wait_for_readers(&self, timeout: Option<Instant>, prev_value: usize) -> bool {
+        tracing::debug!("[parking_lot] wait_for_readers started");
         // At this point WRITER_BIT is already set, we just need to wait for the
         // remaining readers to exit the lock.
         let mut spinwait = SpinWait::new();
@@ -977,6 +989,7 @@ impl RawRwLock {
                 state = self.state.load(Ordering::Acquire);
                 continue;
             }
+            tracing::debug!("[parking_lot] wait_for_readers after spin");
 
             // Set the parked bit
             if state & WRITER_PARKED_BIT == 0 {
@@ -990,6 +1003,7 @@ impl RawRwLock {
                     continue;
                 }
             }
+            tracing::debug!("[parking_lot] wait_for_readers after setting the parked bit");
 
             // Park our thread until we are woken up by an unlock
             // Using the 2nd key at addr + 1
@@ -1000,6 +1014,7 @@ impl RawRwLock {
             };
             let before_sleep = || {};
             let timed_out = |_, _| {};
+            tracing::debug!("[parking_lot] wait_for_readers after set some variables");
             // SAFETY:
             //   * `addr` is an address we control.
             //   * `validate`/`timed_out` does not panic or call into any function of `parking_lot`.
@@ -1014,6 +1029,7 @@ impl RawRwLock {
                     timeout,
                 )
             };
+            tracing::debug!("[parking_lot] wait_for_readers after park_result, {:?}", park_result);
             match park_result {
                 // We still need to re-check the state if we are unparked
                 // since a previous writer timing-out could have allowed
