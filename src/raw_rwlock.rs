@@ -76,6 +76,8 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
             let result = self.lock_exclusive_slow(None);
             tracing::debug!("[parking_lot] lock_exclusive_slow finished");
             debug_assert!(result);
+        } else {
+            tracing::debug!("[parking_lot] lock_exclusive if condition false");
         }
         tracing::debug!("[parking_lot] lock_exclusive_slow deadlock_acquire started");
         self.deadlock_acquire();
@@ -98,6 +100,7 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
 
     #[inline]
     unsafe fn unlock_exclusive(&self) {
+        tracing::debug!("[parking_lot] unlock_exclusive started");
         self.deadlock_release();
         if self
             .state
@@ -106,7 +109,9 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
         {
             return;
         }
+        tracing::debug!("[parking_lot] unlock_exclusive unlock_exclusive_slow started");
         self.unlock_exclusive_slow(false);
+        tracing::debug!("[parking_lot] unlock_exclusive unlock_exclusive_slow finished");
     }
 
     #[inline]
@@ -133,15 +138,19 @@ unsafe impl lock_api::RawRwLock for RawRwLock {
 
     #[inline]
     unsafe fn unlock_shared(&self) {
+        tracing::debug!("[parking_lot] unlock_shared started");
         self.deadlock_release();
         let state = if have_elision() {
+            tracing::debug!("[parking_lot] unlock_shared have elision true");
             self.state.elision_fetch_sub_release(ONE_READER)
         } else {
+            tracing::debug!("[parking_lot] unlock_shared have elision false");
             self.state.fetch_sub(ONE_READER, Ordering::Release)
         };
         if state & (READERS_MASK | WRITER_PARKED_BIT) == (ONE_READER | WRITER_PARKED_BIT) {
             self.unlock_shared_slow();
         }
+        tracing::debug!("[parking_lot] unlock_shared finished");
     }
 
     #[inline]
@@ -730,6 +739,7 @@ impl RawRwLock {
         // At this point WRITER_PARKED_BIT is set and READER_MASK is empty. We
         // just need to wake up a potentially sleeping pending writer.
         // Using the 2nd key at addr + 1
+        tracing::debug!("unlock_shared_slow started");
         let addr = self as *const _ as usize + 1;
         let callback = |_result: UnparkResult| {
             // Clear the WRITER_PARKED_BIT here since there can only be one
