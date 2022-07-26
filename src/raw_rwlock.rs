@@ -994,8 +994,10 @@ impl RawRwLock {
         let mut spinwait = SpinWait::new();
         let mut state = self.state.load(Ordering::Acquire);
         while state & READERS_MASK != 0 {
+            tracing::debug!("[parking_lot] wait_for_readers inside while loop");
             // Spin a few times to wait for readers to exit
             if spinwait.spin() {
+                tracing::debug!("[parking_lot] wait_for_readers inside spinwait.spin");
                 state = self.state.load(Ordering::Acquire);
                 continue;
             }
@@ -1075,6 +1077,7 @@ impl RawRwLock {
                 }
             }
         }
+        tracing::debug!("[parking_lot] wait_for_readers after while loop");
         true
     }
 

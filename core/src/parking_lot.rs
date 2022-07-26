@@ -573,6 +573,7 @@ pub unsafe fn park(
     park_token: ParkToken,
     timeout: Option<Instant>,
 ) -> ParkResult {
+    tracing::trace!("[parking_lot] park started");
     // Grab our thread data, this also ensures that the hash table exists
     with_thread_data(|thread_data| {
         // Lock the bucket for the given key
