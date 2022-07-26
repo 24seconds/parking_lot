@@ -648,7 +648,7 @@ impl RawRwLock {
             try_lock,
             WRITER_BIT | UPGRADABLE_BIT,
         );
-        tracing::debug!("[parking_lot] lock_exclusive_slow after timeout ");
+        tracing::debug!("[parking_lot] lock_exclusive_slow after timeout {:?}", timed_out);
         if timed_out {
             return false;
         }
@@ -1087,22 +1087,26 @@ impl RawRwLock {
         mut try_lock: impl FnMut(&mut usize) -> bool,
         validate_flags: usize,
     ) -> bool {
+        tracing::debug!("lock_common started");
         let mut spinwait = SpinWait::new();
         let mut state = self.state.load(Ordering::Relaxed);
         loop {
             // Attempt to grab the lock
             if try_lock(&mut state) {
+                tracing::debug!("lock_common try lock succeed");
                 return true;
             }
 
             // If there are no parked threads, try spinning a few times.
             if state & (PARKED_BIT | WRITER_PARKED_BIT) == 0 && spinwait.spin() {
+                tracing::debug!("If there are no parked threads, try spinning a few times. inside if condition");
                 state = self.state.load(Ordering::Relaxed);
                 continue;
             }
 
             // Set the parked bit
             if state & PARKED_BIT == 0 {
+                tracing::debug!("Set the parked bit. inside if condition");
                 if let Err(x) = self.state.compare_exchange_weak(
                     state,
                     state | PARKED_BIT,
@@ -1135,6 +1139,7 @@ impl RawRwLock {
             let park_result = unsafe {
                 parking_lot_core::park(addr, validate, before_sleep, timed_out, token, timeout)
             };
+            tracing::debug!("park_result: {:?}", park_result);
             match park_result {
                 // The thread that unparked us passed the lock on to us
                 // directly without unlocking it.
@@ -1152,6 +1157,7 @@ impl RawRwLock {
 
             // Loop back and try locking again
             spinwait.reset();
+            tracing::debug!("after spinwait.reset();");
             state = self.state.load(Ordering::Relaxed);
         }
     }
