@@ -53,6 +53,7 @@ impl SpinWait {
         if self.counter <= 3 {
             cpu_relax(1 << self.counter);
         } else {
+            tracing::debug!("spin, thraed_yield");
             thread_parker::thread_yield();
         }
         true

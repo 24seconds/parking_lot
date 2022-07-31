@@ -153,6 +153,7 @@ impl ThreadData {
         // Keep track of the total number of live ThreadData objects and resize
         // the hash table accordingly.
         let num_threads = NUM_THREADS.fetch_add(1, Ordering::Relaxed) + 1;
+        tracing::debug!("num_threads: {:?}", num_threads);
         grow_hashtable(num_threads);
 
         ThreadData {
@@ -604,7 +605,7 @@ pub unsafe fn park(
 
         // Invoke the pre-sleep callback
         before_sleep();
-        tracing::trace!("[parking_lot] park before_sleep finished");
+        tracing::trace!("[parking_lot] park before_sleep finished, timeout: {:?}", timeout);
 
         // Park our thread and determine whether we were woken up by an unpark
         // or by our timeout. Note that this isn't precise: we can still be

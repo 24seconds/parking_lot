@@ -641,6 +641,8 @@ impl RawRwLock {
         };
         tracing::debug!("[parking_lot] lock_exclusive_slow after try lock ");
 
+        tracing::debug!("[parking_lot] lock_exclusive_slow timeout value {:?}", timeout);
+
         // Step 1: grab exclusive ownership of WRITER_BIT
         let timed_out = !self.lock_common(
             timeout,
@@ -1047,12 +1049,14 @@ impl RawRwLock {
                 // since a previous writer timing-out could have allowed
                 // another reader to sneak in before we parked.
                 ParkResult::Unparked(_) | ParkResult::Invalid => {
+                    tracing::debug!("[parking_lot] wait_for_readers unparked but invalid");
                     state = self.state.load(Ordering::Acquire);
                     continue;
                 }
 
                 // Timeout expired
                 ParkResult::TimedOut => {
+                    tracing::debug!("[parking_lot] wait_for_readers timedout");
                     // We need to release WRITER_BIT and revert back to
                     // our previous value. We also wake up any threads that
                     // might be waiting on WRITER_BIT.
